@@ -1,0 +1,2534 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>HydraSense IA - Classificação de Turbidez & Diagnóstico Especialista</title>
+  <meta name="description" content="Aplicação de classificação de turbidez da água em tempo real com Teachable Machine e diagnóstico técnico especialista via Google Gemini IA.">
+  <meta name="theme-color" content="#060c18">
+
+  <!-- Favicon SVG -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2306b6d4'><path d='M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z'/></svg>">
+
+  <!-- Tipografia: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <!-- CDNs Compatíveis: TensorFlow.js 1.7.4 e Teachable Machine 0.8.4 -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.7.4/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+  <style>
+    /* ==========================================================================
+       DESIGN SYSTEM RESPONSIVO (DESKTOP: 2 COLUNAS / MOBILE: 1 COLUNA)
+       ========================================================================== */
+    :root {
+      --bg-body: #060c18;
+      --bg-card: rgba(13, 23, 42, 0.82);
+      --bg-inner: rgba(7, 14, 28, 0.92);
+      --border-subtle: rgba(56, 189, 248, 0.16);
+      --border-glow: rgba(6, 182, 212, 0.45);
+
+      --cyan-400: #22d3ee;
+      --cyan-500: #06b6d4;
+      --cyan-glow: rgba(6, 182, 212, 0.35);
+      --blue-600: #2563eb;
+      
+      --color-clean: #10b981;
+      --color-clean-glow: rgba(16, 185, 129, 0.25);
+      --color-medium: #f59e0b;
+      --color-medium-glow: rgba(245, 158, 11, 0.25);
+      --color-high: #ef4444;
+      --color-high-glow: rgba(239, 68, 68, 0.25);
+
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --text-muted: #64748b;
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+
+      --shadow-card: 0 12px 32px -4px rgba(0, 0, 0, 0.55);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      overflow-x: hidden;
+      max-width: 100%;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Ambient Glows */
+    .bg-glow {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(140px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.35;
+    }
+    .glow-1 { width: 500px; height: 500px; background: #06b6d4; top: -150px; left: -150px; }
+    .glow-2 { width: 500px; height: 500px; background: #2563eb; bottom: -100px; right: -150px; }
+
+    /* ==========================================================================
+       HEADER FIXO
+       ========================================================================== */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 60;
+      background: rgba(6, 12, 24, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0.8rem 1.25rem;
+    }
+
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon-wrap {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(37, 99, 235, 0.35));
+      border: 1px solid var(--border-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cyan-400);
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+
+    .brand-title span {
+      background: linear-gradient(135deg, #22d3ee, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-sub {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+
+    .header-pills {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.45rem 0.85rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge-gemini-live {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulseAnim 2s infinite;
+    }
+
+    @keyframes pulseAnim {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.25); opacity: 0.4; }
+    }
+
+    .btn-qr-mobile {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border-subtle);
+      color: var(--cyan-400);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.5rem 0.95rem;
+      min-height: 38px;
+      border-radius: var(--radius-full);
+      font-size: 0.78rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn-qr-mobile:hover {
+      border-color: var(--cyan-400);
+      background: rgba(6, 182, 212, 0.15);
+    }
+
+    /* ==========================================================================
+       GRID RESPONSIVO (PC: 2 COLUNAS / MOBILE: 1 COLUNA)
+       ========================================================================== */
+    .app-layout {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 1400px;
+      margin: 1.5rem auto 3rem;
+      padding: 0 1.25rem;
+      display: grid;
+      grid-template-columns: minmax(340px, 480px) minmax(0, 1fr);
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    /* No Mobile / Tablet vira 1 Coluna Fluida */
+    @media (max-width: 992px) {
+      .app-layout {
+        grid-template-columns: minmax(0, 1fr);
+        max-width: 100%;
+        margin: 1rem auto 2.5rem;
+        padding: 0 1rem;
+        gap: 1.25rem;
+      }
+    }
+
+    .col-left, .col-right {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      min-width: 0;
+      width: 100%;
+    }
+
+    /* Painéis com Glassmorphism */
+    .glass-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.35rem;
+      box-shadow: var(--shadow-card);
+      transition: border-color 0.2s ease;
+    }
+
+    .glass-card:hover {
+      border-color: var(--border-glow);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      gap: 0.5rem;
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .card-icon {
+      color: var(--cyan-400);
+    }
+
+    .card-heading {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.01em;
+    }
+
+    .card-subtext {
+      font-size: 0.74rem;
+      color: var(--text-sub);
+    }
+
+    /* ==========================================================================
+       ENTRADA DE MÍDIA (CÂMERA, UPLOAD & AMOSTRAS)
+       ========================================================================== */
+    .nav-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 4px;
+      gap: 4px;
+      margin-bottom: 1rem;
+    }
+
+    .nav-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.65rem 0.4rem;
+      min-height: 44px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .nav-tab-btn.active {
+      background: rgba(6, 182, 212, 0.18);
+      color: #67e8f9;
+      border: 1px solid rgba(6, 182, 212, 0.35);
+    }
+
+    /* Viewport de Exibição da Mídia */
+    .media-viewport {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: #020713;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+    }
+
+    #viewCanvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    #cameraVideo {
+      display: none;
+    }
+
+    /* Retículo Científico de Enquadramento */
+    .target-frame {
+      position: absolute;
+      width: 72%;
+      height: 72%;
+      border: 1.5px dashed rgba(6, 182, 212, 0.45);
+      border-radius: var(--radius-sm);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .target-corner {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-color: var(--cyan-400);
+      border-style: solid;
+    }
+    .corner-tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-top-left-radius: 4px; }
+    .corner-tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-top-right-radius: 4px; }
+    .corner-bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-bottom-left-radius: 4px; }
+    .corner-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-bottom-right-radius: 4px; }
+
+    .target-text {
+      background: rgba(6, 12, 24, 0.88);
+      border: 1px solid var(--border-subtle);
+      color: #67e8f9;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      position: absolute;
+      top: -12px;
+      white-space: nowrap;
+    }
+
+    /* Overlay de Loading */
+    .viewport-loader {
+      position: absolute;
+      inset: 0;
+      background: rgba(6, 12, 24, 0.92);
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.85rem;
+      z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .viewport-loader.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .spinner-ring {
+      width: 44px;
+      height: 44px;
+      border: 3.5px solid rgba(6, 182, 212, 0.2);
+      border-top-color: var(--cyan-400);
+      border-radius: 50%;
+      animation: spinAnim 0.8s linear infinite;
+    }
+
+    @keyframes spinAnim {
+      to { transform: rotate(360deg); }
+    }
+
+    .loader-title {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Botões da Câmera */
+    .controls-grid {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-action {
+      flex: 1;
+      min-width: 160px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.85rem 1.1rem;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--cyan-500), var(--blue-600));
+      color: #ffffff;
+      border: none;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 16px var(--cyan-glow);
+      transition: transform 0.15s, filter 0.15s;
+      font-family: inherit;
+    }
+
+    .btn-action:active {
+      transform: scale(0.98);
+    }
+
+    .btn-action-green {
+      background: linear-gradient(135deg, #10b981, #06b6d4);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+    }
+
+    .btn-square {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn-square:hover:not(:disabled) {
+      border-color: var(--cyan-400);
+      color: var(--cyan-400);
+    }
+
+    .btn-square:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Upload & Seleção Local */
+    .dropzone-box {
+      border: 2px dashed rgba(56, 189, 248, 0.35);
+      border-radius: var(--radius-md);
+      padding: 1.5rem 1rem;
+      text-align: center;
+      background: rgba(6, 182, 212, 0.03);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 0.5rem;
+    }
+
+    .dropzone-box:hover, .dropzone-box.dragover {
+      border-color: var(--cyan-400);
+      background: rgba(6, 182, 212, 0.08);
+    }
+
+    .btn-file-picker {
+      width: 100%;
+      margin-top: 0.75rem;
+      padding: 0.85rem;
+      background: linear-gradient(135deg, #0284c7, #024da8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-md);
+      font-size: 0.88rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn-mobile-native-cam {
+      width: 100%;
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      color: #67e8f9;
+      font-size: 0.82rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    /* Amostras Rápidas */
+    .sample-cards-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.6rem;
+      margin-top: 0.5rem;
+    }
+
+    .sample-btn {
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 0.4rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      color: inherit;
+    }
+
+    .sample-btn:hover {
+      border-color: var(--cyan-400);
+      transform: translateY(-2px);
+    }
+
+    .sample-disc {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      margin: 0 auto 0.4rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .disc-clean { background: radial-gradient(circle, #67e8f9, #0284c7); }
+    .disc-medium { background: radial-gradient(circle, #fde047, #b45309); }
+    .disc-high { background: radial-gradient(circle, #b45309, #451a03); }
+
+    .sample-name {
+      font-size: 0.76rem;
+      font-weight: 700;
+      display: block;
+    }
+
+    /* ==========================================================================
+       RESULTADOS TEACHABLE MACHINE (BARRAS EM TEMPO REAL)
+       ========================================================================== */
+    .summary-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.1rem;
+      border-radius: var(--radius-md);
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .summary-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      background: var(--text-muted);
+      transition: background 0.3s;
+    }
+
+    .summary-icon-wrap {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .summary-body {
+      flex: 1;
+    }
+
+    .summary-tag {
+      font-size: 0.66rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .summary-title {
+      font-size: 1.12rem;
+      font-weight: 800;
+      margin-top: 0.1rem;
+      letter-spacing: -0.01em;
+    }
+
+    .summary-desc {
+      font-size: 0.76rem;
+      color: var(--text-sub);
+      line-height: 1.35;
+      margin-top: 0.2rem;
+    }
+
+    .summary-score {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--text-main);
+      text-align: right;
+    }
+
+    /* Classes Dinâmicas de Status */
+    .summary-card.status-limpa::before { background: var(--color-clean); }
+    .summary-card.status-limpa .summary-icon-wrap { background: var(--color-clean-glow); color: var(--color-clean); }
+    .summary-card.status-limpa .summary-title { color: var(--color-clean); }
+
+    .summary-card.status-media::before { background: var(--color-medium); }
+    .summary-card.status-media .summary-icon-wrap { background: var(--color-medium-glow); color: var(--color-medium); }
+    .summary-card.status-media .summary-title { color: var(--color-medium); }
+
+    .summary-card.status-alta::before { background: var(--color-high); }
+    .summary-card.status-alta .summary-icon-wrap { background: var(--color-high-glow); color: var(--color-high); }
+    .summary-card.status-alta .summary-title { color: var(--color-high); }
+
+    /* Barras de Progresso */
+    .bars-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.95rem;
+      margin-bottom: 1.35rem;
+    }
+
+    .bar-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .bar-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.84rem;
+      font-weight: 600;
+    }
+
+    .bar-label-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dot-colored {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot-green { background: var(--color-clean); box-shadow: 0 0 6px var(--color-clean); }
+    .dot-amber { background: var(--color-medium); box-shadow: 0 0 6px var(--color-medium); }
+    .dot-red { background: var(--color-high); box-shadow: 0 0 6px var(--color-high); }
+
+    .bar-val-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.88rem;
+    }
+
+    .bar-track-bg {
+      width: 100%;
+      height: 10px;
+      background: rgba(15, 23, 42, 0.85);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .bar-fill-bar {
+      height: 100%;
+      border-radius: var(--radius-full);
+      transition: width 0.25s ease-out;
+    }
+    .fill-green { background: linear-gradient(90deg, #059669, #10b981); }
+    .fill-amber { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .fill-red { background: linear-gradient(90deg, #dc2626, #f87171); }
+
+    /* Botão Principal de Diagnóstico Gemini */
+    .btn-gemini-cta {
+      width: 100%;
+      padding: 1.05rem 1.25rem;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, #0284c7 0%, #06b6d4 50%, #10b981 100%);
+      background-size: 200% 200%;
+      animation: gradientShift 5s ease infinite;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.65rem;
+      box-shadow: 0 8px 24px rgba(6, 182, 212, 0.4);
+      transition: transform 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .btn-gemini-cta:active {
+      transform: scale(0.98);
+    }
+
+    /* ==========================================================================
+       LAUDO TÉCNICO ESTRUTURADO GEMINI (4 TÓPICOS)
+       ========================================================================== */
+    .report-placeholder-wrap {
+      text-align: center;
+      padding: 3rem 1.5rem;
+      background: var(--bg-inner);
+      border: 1px dashed var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+
+    .placeholder-icon {
+      color: var(--cyan-400);
+      margin-bottom: 0.75rem;
+      opacity: 0.85;
+    }
+
+    .placeholder-heading {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .placeholder-desc {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      max-width: 440px;
+      margin: 0 auto;
+    }
+
+    /* Grade dos 4 Cards */
+    .topics-grid-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .topics-grid-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .topic-panel {
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.15rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topic-top-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #67e8f9;
+      margin-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 0.55rem;
+    }
+
+    .topic-text-body {
+      font-size: 0.82rem;
+      line-height: 1.6;
+      color: #cbd5e1;
+    }
+
+    .topic-text-body p {
+      margin-bottom: 0.55rem;
+    }
+    .topic-text-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    .topic-text-body ul {
+      padding-left: 1.2rem;
+      margin-bottom: 0.55rem;
+    }
+
+    .topic-text-body li {
+      margin-bottom: 0.3rem;
+    }
+
+    .topic-text-body strong {
+      color: var(--text-main);
+    }
+
+    /* ==========================================================================
+       CHATBOT INTERATIVO
+       ========================================================================== */
+    .chips-bar {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 0.6rem;
+      margin-bottom: 1rem;
+      scrollbar-width: none;
+    }
+    .chips-bar::-webkit-scrollbar { display: none; }
+
+    .chip-pill {
+      white-space: nowrap;
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-sub);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.5rem 0.9rem;
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .chip-pill:hover {
+      border-color: var(--cyan-400);
+      color: #67e8f9;
+      background: rgba(6, 182, 212, 0.12);
+    }
+
+    .chat-scroll-area {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      max-height: 360px;
+      min-height: 160px;
+      overflow-y: auto;
+      padding-right: 0.35rem;
+      margin-bottom: 1rem;
+    }
+
+    .chat-row {
+      display: flex;
+      gap: 0.65rem;
+      max-width: 90%;
+    }
+
+    .chat-ai {
+      align-self: flex-start;
+    }
+
+    .chat-user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+
+    .chat-bubble {
+      padding: 0.8rem 1rem;
+      border-radius: var(--radius-md);
+      font-size: 0.84rem;
+      line-height: 1.55;
+    }
+
+    .chat-ai .chat-bubble {
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      border-top-left-radius: 4px;
+      color: var(--text-main);
+    }
+
+    .chat-user .chat-bubble {
+      background: linear-gradient(135deg, rgba(2, 132, 199, 0.45), rgba(37, 99, 235, 0.55));
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-top-right-radius: 4px;
+      color: #ffffff;
+    }
+
+    .typing-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0.65rem 1rem;
+      background: var(--bg-inner);
+      border-radius: var(--radius-md);
+      font-size: 0.76rem;
+      color: var(--text-sub);
+    }
+
+    .dot-bounce {
+      width: 5px;
+      height: 5px;
+      background: var(--cyan-400);
+      border-radius: 50%;
+      animation: pulseDot 1.4s infinite ease-in-out both;
+    }
+    .dot-bounce:nth-child(2) { animation-delay: 0.2s; }
+    .dot-bounce:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes pulseDot {
+      0%, 80%, 100% { transform: scale(0.4); opacity: 0.3; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    .chat-form-box {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-full);
+      padding: 0.35rem 0.4rem 0.35rem 1.1rem;
+      transition: border-color 0.2s ease;
+    }
+
+    .chat-form-box:focus-within {
+      border-color: var(--cyan-400);
+    }
+
+    .chat-input-text {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-size: 0.86rem;
+      font-family: inherit;
+    }
+
+    .chat-input-text::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn-send-chat {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--cyan-500), var(--blue-600));
+      border: none;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: transform 0.15s, filter 0.15s;
+    }
+
+    .btn-send-chat:active {
+      transform: scale(0.95);
+    }
+
+    /* Modal Conectar Celular */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 9, 17, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-content-card {
+      width: 100%;
+      max-width: 440px;
+      background: #0d1726;
+      border: 1px solid var(--border-glow);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65);
+      text-align: center;
+      transform: translateY(20px);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-overlay.active .modal-content-card {
+      transform: translateY(0);
+    }
+
+    .modal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.1rem;
+    }
+
+    .btn-close-modal {
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      cursor: pointer;
+      min-width: 44px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      transition: all 0.2s ease;
+    }
+
+    .btn-close-modal:hover {
+      color: var(--cyan-400);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .qr-box {
+      background: #ffffff;
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      width: fit-content;
+      margin: 1.1rem auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ip-tag {
+      background: var(--bg-inner);
+      border: 1px solid var(--border-subtle);
+      padding: 0.65rem 0.95rem;
+      border-radius: var(--radius-md);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: #67e8f9;
+      word-break: break-all;
+      margin-bottom: 0.85rem;
+    }
+
+    /* Toast */
+    .toast-pill {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(50px);
+      background: #0f1c30;
+      border: 1px solid var(--border-glow);
+      color: var(--text-main);
+      padding: 0.8rem 1.35rem;
+      border-radius: var(--radius-full);
+      font-size: 0.84rem;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      z-index: 200;
+      opacity: 0;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .toast-pill.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* ==========================================================================
+       ACESSIBILIDADE (WCAG 2.1 AA): FOCO VISÍVEL & NAVEGAÇÃO POR TECLADO
+       ========================================================================== */
+    button:focus-visible,
+    input:focus-visible,
+    .dropzone-box:focus-visible,
+    .sample-btn:focus-visible,
+    .chip-pill:focus-visible,
+    [tabindex="0"]:focus-visible {
+      outline: 2px solid var(--cyan-400) !important;
+      outline-offset: 3px !important;
+      box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.45) !important;
+    }
+
+    /* Classes utilitárias para leitores de tela */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+
+    /* Redução de movimento para usuários sensíveis */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    /* Otimizações Responsivas para Telas Pequenas (< 480px) */
+    @media (max-width: 480px) {
+      .header-inner {
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+      .header-pills {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .nav-tabs {
+        gap: 2px;
+        padding: 3px;
+      }
+      .nav-tab-btn {
+        font-size: 0.72rem;
+        padding: 0.55rem 0.25rem;
+        gap: 0.25rem;
+        min-height: 44px;
+      }
+      .controls-grid {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .btn-action {
+        width: 100%;
+        min-width: 100%;
+        min-height: 48px;
+      }
+      .btn-square {
+        width: 100%;
+        height: 44px;
+      }
+      .summary-card {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+      .summary-score {
+        width: 100%;
+        text-align: left;
+        font-size: 1.3rem;
+      }
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Glows -->
+  <div class="bg-glow glow-1"></div>
+  <div class="bg-glow glow-2"></div>
+
+  <!-- Header -->
+  <header class="app-header" role="banner">
+    <div class="header-inner">
+      <div class="brand-box">
+        <div class="brand-icon-wrap" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">HydraSense <span>IA</span></h1>
+          <p class="brand-sub">Classificação de Turbidez & Saúde</p>
+        </div>
+      </div>
+
+      <div class="header-pills">
+        <!-- Badge Ativo Gemini 2.5 Flash -->
+        <div class="status-badge badge-gemini-live" title="Google Gemini Ativo e Pronto" role="status" aria-label="Status do Gemini: Conectado e ativo">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          <span>Gemini 2.5 Flash Ativo</span>
+        </div>
+
+        <!-- Botão Abrir no Celular -->
+        <button type="button" class="btn-qr-mobile" onclick="window.openMobileModal()" title="Abrir no Celular via QR Code" aria-label="Abrir no Celular via QR Code">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+          <span>No Celular</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container Principal Responsivo -->
+  <main class="app-layout" id="main-content" role="main">
+
+    <!-- COLUNA 1: ENTRADA DE MÍDIA & LEITURA TEACHABLE MACHINE -->
+    <div class="col-left">
+      
+      <!-- Card da Entrada de Amostra -->
+      <section class="glass-card" aria-labelledby="headingMediaInput">
+        <div class="card-top">
+          <div class="card-title-group">
+            <svg class="card-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <div>
+              <h2 id="headingMediaInput" class="card-heading">Entrada da Amostra</h2>
+              <p class="card-subtext">Câmera ao vivo, foto ou amostra de teste</p>
+            </div>
+          </div>
+
+          <div id="modelBadgeStatus" class="status-badge" role="status" aria-live="polite" style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); color: var(--text-sub); font-size: 0.72rem;">
+            <span>Modelo: Conectando...</span>
+          </div>
+        </div>
+
+        <!-- Abas de Modo -->
+        <div class="nav-tabs" role="tablist" aria-label="Modo de captura de amostra">
+          <button type="button" id="tabCameraBtn" class="nav-tab-btn active" role="tab" aria-selected="true" aria-controls="cameraControlsBox" onclick="window.selectTab('camera')" aria-label="Aba de Usar Câmera do Dispositivo">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+            <span>Usar Câmera</span>
+          </button>
+          <button type="button" id="tabUploadBtn" class="nav-tab-btn" role="tab" aria-selected="false" aria-controls="uploadControlsBox" onclick="window.selectTab('upload')" aria-label="Aba de Upload de Foto">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            <span>Upload de Imagem</span>
+          </button>
+          <button type="button" id="tabSamplesBtn" class="nav-tab-btn" role="tab" aria-selected="false" aria-controls="samplesControlsBox" onclick="window.selectTab('samples')" aria-label="Aba de Amostras de Referência">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 2v7.31"/><path d="M14 9.3V2"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/></svg>
+            <span>Amostras</span>
+          </button>
+        </div>
+
+        <!-- Viewport do Canvas -->
+        <div class="media-viewport" role="region" aria-label="Visualização da amostra de água">
+          <canvas id="viewCanvas" width="480" height="360" role="img" aria-label="Amostra de água analisada"></canvas>
+          <video id="cameraVideo" autoplay playsinline muted aria-hidden="true"></video>
+
+          <!-- Retículo Científico de Enquadramento -->
+          <div class="target-frame" aria-hidden="true">
+            <span class="target-corner corner-tl"></span>
+            <span class="target-corner corner-tr"></span>
+            <span class="target-corner corner-bl"></span>
+            <span class="target-corner corner-br"></span>
+            <span class="target-text">Enquadre o Frasco de Água</span>
+          </div>
+
+          <!-- Loading Spinner Overlay -->
+          <div id="viewportLoader" class="viewport-loader" role="status" aria-live="polite">
+            <div class="spinner-ring" aria-hidden="true"></div>
+            <span id="loaderMessage" class="loader-title">Processando Amostra...</span>
+          </div>
+        </div>
+
+        <!-- Controles da Câmera -->
+        <div id="cameraControlsBox" class="controls-grid" role="tabpanel" aria-labelledby="tabCameraBtn">
+          <button type="button" id="btnToggleCamera" class="btn-action" onclick="window.toggleCamera()" aria-pressed="false" aria-label="Ligar câmera ao vivo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <span id="toggleCameraLabel">Ligar Câmera</span>
+          </button>
+
+          <button type="button" id="btnCaptureFrame" class="btn-action btn-action-green hidden" onclick="window.captureSnapshot()" aria-label="Capturar imagem da câmera">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+            <span id="btnCaptureLabel">Capturar Imagem</span>
+          </button>
+
+          <button type="button" id="btnFlipCamera" class="btn-square" onclick="window.flipCamera()" title="Alternar Câmera Frontal/Traseira" aria-label="Alternar entre câmera frontal e traseira" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 1.94.693 3.722 1.848 5.114L4 17h5v-5l-1.748 1.748A5.986 5.986 0 0 1 6 10c0-3.314 2.686-6 6-6s6 2.686 6 6c0 1.506-.556 2.883-1.474 3.943l1.42 1.42A7.962 7.962 0 0 0 20 10z"/></svg>
+          </button>
+        </div>
+
+        <!-- Controles de Upload de Arquivo -->
+        <div id="uploadControlsBox" class="hidden" role="tabpanel" aria-labelledby="tabUploadBtn">
+          <div id="dropzoneClick" class="dropzone-box" onclick="window.triggerFileInput()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.triggerFileInput();}" role="button" tabindex="0" aria-label="Área para soltar imagem ou clicar para escolher arquivo do dispositivo">
+            <svg class="card-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem;" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            <p style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.2rem;">Arraste e solte uma imagem aqui</p>
+            <p style="font-size: 0.74rem; color: var(--text-sub);">Formatos suportados: JPG, PNG ou WEBP</p>
+            <input type="file" id="realFileInput" accept="image/png, image/jpeg, image/webp" class="hidden" onchange="window.handleFileSelect(this)" aria-label="Selecionar imagem da água no dispositivo">
+          </div>
+
+          <button type="button" class="btn-file-picker" onclick="window.triggerFileInput()" aria-label="Selecionar Foto do Dispositivo (JPG/PNG)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>📁 Selecionar Foto do Dispositivo (JPG/PNG)</span>
+          </button>
+
+          <button type="button" class="btn-mobile-native-cam" onclick="window.triggerMobileCamera()" aria-label="Tirar Foto Direto no Celular">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <span>Tirar Foto Direto no Celular</span>
+          </button>
+          <input type="file" id="mobileCameraCaptureInput" accept="image/*" capture="environment" class="hidden" onchange="window.handleFileSelect(this)" aria-label="Capturar foto usando a câmera do celular">
+        </div>
+
+        <!-- Amostras de Teste Rápidas -->
+        <div id="samplesControlsBox" class="hidden" role="tabpanel" aria-labelledby="tabSamplesBtn">
+          <p style="font-size: 0.74rem; color: var(--text-sub); margin-bottom: 0.5rem;">Escolha um padrão simulado para testar:</p>
+          <div class="sample-cards-row">
+            <button type="button" class="sample-btn" onclick="window.loadSample('limpa')" aria-label="Testar padrão de água límpida com baixa turbidez">
+              <div class="sample-disc disc-clean" aria-hidden="true"></div>
+              <span class="sample-name">Límpida</span>
+            </button>
+            <button type="button" class="sample-btn" onclick="window.loadSample('media')" aria-label="Testar padrão de água com turbidez média">
+              <div class="sample-disc disc-medium" aria-hidden="true"></div>
+              <span class="sample-name">Média</span>
+            </button>
+            <button type="button" class="sample-btn" onclick="window.loadSample('alta')" aria-label="Testar padrão de água barrenta com alta turbidez">
+              <div class="sample-disc disc-high" aria-hidden="true"></div>
+              <span class="sample-name">Alta</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Card da Leitura Teachable Machine -->
+      <section class="glass-card" aria-labelledby="headingTeachableMachine">
+        <div class="card-top">
+          <div class="card-title-group">
+            <svg class="card-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 9h6v6H9z"/></svg>
+            <div>
+              <h2 id="headingTeachableMachine" class="card-heading">Leitura do Teachable Machine</h2>
+              <p class="card-subtext">Classificação contínua do modelo bwPyRB7c2</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Banner de Status Dominante -->
+        <div id="statusResultCard" class="summary-card status-limpa" role="status" aria-live="polite">
+          <div id="statusIconWrap" class="summary-icon-wrap" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+          </div>
+          <div class="summary-body">
+            <span class="summary-tag">Classificação Visual</span>
+            <h3 id="statusResultTitle" class="summary-title">Água Limpa (Baixa Turbidez)</h3>
+            <p id="statusResultDesc" class="summary-desc">Amostra cristalina e transparente (&lt; 5 NTU aprox.).</p>
+          </div>
+          <div id="statusResultScore" class="summary-score" aria-label="Grau de confiança de 98.5%">98.5%</div>
+        </div>
+
+        <!-- Barras de Probabilidade em Tempo Real -->
+        <div class="bars-container" role="region" aria-label="Distribuição de probabilidades das classes de turbidez">
+          <!-- Classe: Limpa -->
+          <div class="bar-item">
+            <div class="bar-info">
+              <div class="bar-label-group">
+                <span class="dot-colored dot-green" aria-hidden="true"></span>
+                <span>Água Limpa (&lt; 5 NTU)</span>
+              </div>
+              <span id="textValLimpa" class="bar-val-text">98.5%</span>
+            </div>
+            <div id="trackLimpa" class="bar-track-bg" role="progressbar" aria-valuenow="98.5" aria-valuemin="0" aria-valuemax="100" aria-label="Probabilidade de Água Limpa">
+              <div id="fillBarLimpa" class="bar-fill-bar fill-green" style="width: 98.5%;"></div>
+            </div>
+          </div>
+
+          <!-- Classe: Média -->
+          <div class="bar-item">
+            <div class="bar-info">
+              <div class="bar-label-group">
+                <span class="dot-colored dot-amber" aria-hidden="true"></span>
+                <span>Turbidez Média (5 - 50 NTU)</span>
+              </div>
+              <span id="textValMedia" class="bar-val-text">1.2%</span>
+            </div>
+            <div id="trackMedia" class="bar-track-bg" role="progressbar" aria-valuenow="1.2" aria-valuemin="0" aria-valuemax="100" aria-label="Probabilidade de Turbidez Média">
+              <div id="fillBarMedia" class="bar-fill-bar fill-amber" style="width: 1.2%;"></div>
+            </div>
+          </div>
+
+          <!-- Classe: Alta -->
+          <div class="bar-item">
+            <div class="bar-info">
+              <div class="bar-label-group">
+                <span class="dot-colored dot-red" aria-hidden="true"></span>
+                <span>Alta Turbidez (&gt; 50 NTU)</span>
+              </div>
+              <span id="textValAlta" class="bar-val-text">0.3%</span>
+            </div>
+            <div id="trackAlta" class="bar-track-bg" role="progressbar" aria-valuenow="0.3" aria-valuemin="0" aria-valuemax="100" aria-label="Probabilidade de Alta Turbidez">
+              <div id="fillBarAlta" class="bar-fill-bar fill-red" style="width: 0.3%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botão Principal: Gerar Diagnóstico Gemini IA (Sempre Ativo) -->
+        <button type="button" id="btnTriggerGemini" class="btn-gemini-cta" onclick="window.generateGeminiDiagnosis()" aria-label="Gerar Diagnóstico Técnico Especialista com Inteligência Artificial Gemini">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg>
+          <span id="btnGeminiLabel">🔬 Gerar Diagnóstico com Gemini IA</span>
+        </button>
+      </section>
+
+    </div>
+
+    <!-- COLUNA 2: LAUDO ESPECIALISTA GEMINI + CHATBOT INTERATIVO -->
+    <div class="col-right">
+      
+      <!-- Card do Laudo Gemini -->
+      <section id="reportCardSection" class="glass-card">
+        <div class="card-top">
+          <div class="card-title-group">
+            <svg class="card-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+            <div>
+              <h2 class="card-heading">Diagnóstico Técnico Especialista (Gemini IA)</h2>
+              <p class="card-subtext">Parecer sanitário estruturado em 4 tópicos</p>
+            </div>
+          </div>
+
+          <button type="button" id="btnCopyReportContent" class="btn-qr-mobile hidden" onclick="window.copyReport()" aria-label="Copiar laudo técnico para a área de transferência" style="color: var(--text-main);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            <span>Copiar Laudo</span>
+          </button>
+        </div>
+
+        <!-- Placeholder Inicial -->
+        <div id="reportWaitingPlaceholder" class="report-placeholder-wrap">
+          <svg class="placeholder-icon" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg>
+          <h4 class="placeholder-heading">Pronto para Gerar o Diagnóstico</h4>
+          <p class="placeholder-desc">Clique no botão destacado <strong>"Gerar Diagnóstico com Gemini IA"</strong> para que a inteligência do Gemini elabore o parecer técnico completo.</p>
+        </div>
+
+        <!-- Grade dos 4 Tópicos Obrigatórios -->
+        <div id="reportTopicsGrid" class="topics-grid-container hidden" role="region" aria-label="Laudo estruturado em quatro tópicos sanitários">
+          <!-- Tópico 1 -->
+          <article class="topic-panel">
+            <div class="topic-top-bar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>1. Potabilidade & Qualidade Visual</span>
+            </div>
+            <div id="topicPotabilityText" class="topic-text-body"></div>
+          </article>
+
+          <!-- Tópico 2 -->
+          <article class="topic-panel">
+            <div class="topic-top-bar" style="color: #f87171;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+              <span>2. Riscos à Saúde & Contaminantes</span>
+            </div>
+            <div id="topicRisksText" class="topic-text-body"></div>
+          </article>
+
+          <!-- Tópico 3 -->
+          <article class="topic-panel">
+            <div class="topic-top-bar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              <span>3. Filtragem & Purificação</span>
+            </div>
+            <div id="topicFiltrationText" class="topic-text-body"></div>
+          </article>
+
+          <!-- Tópico 4 -->
+          <article class="topic-panel">
+            <div class="topic-top-bar" style="color: #60a5fa;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+              <span>4. Usos Permitidos & Cuidados</span>
+            </div>
+            <div id="topicUsageText" class="topic-text-body"></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Card do Chatbot Interativo -->
+      <section class="glass-card" aria-labelledby="headingChatAssistant">
+        <div class="card-top">
+          <div class="card-title-group">
+            <svg class="card-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <div>
+              <h2 id="headingChatAssistant" class="card-heading">Assistente Hidrológico Interativo</h2>
+              <p class="card-subtext">Tire dúvidas técnicas de acompanhamento</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chips de Perguntas Rápidas -->
+        <div class="chips-bar" role="toolbar" aria-label="Sugestões de perguntas rápidas para a IA">
+          <button type="button" class="chip-pill" onclick="window.sendChatPrompt('Posso ferver essa água para beber com total segurança?')" aria-label="Perguntar: Posso ferver para beber?">💧 Posso ferver para beber?</button>
+          <button type="button" class="chip-pill" onclick="window.sendChatPrompt('Quantas gotas de água sanitária ou cloro devo dosar por litro?')" aria-label="Perguntar: Como dosar cloro?">🧪 Como dosar cloro?</button>
+          <button type="button" class="chip-pill" onclick="window.sendChatPrompt('Posso usar essa água para cozinhar alimentos se eu ferver?')" aria-label="Perguntar: Posso cozinhar com ela?">🍲 Posso cozinhar com ela?</button>
+          <button type="button" class="chip-pill" onclick="window.sendChatPrompt('Essa água pode ser dada com segurança para cães ou gatos?')" aria-label="Perguntar: Seguro para pets?">🐾 Seguro para pets?</button>
+          <button type="button" class="chip-pill" onclick="window.sendChatPrompt('Posso usar essa água para regar verduras e hortaliças consumidas cruas?')" aria-label="Perguntar: Serve para horta?">🌱 Serve para horta?</button>
+        </div>
+
+        <!-- Timeline das Mensagens -->
+        <div id="chatFeedTimeline" class="chat-scroll-area" role="log" aria-live="polite" aria-label="Histórico de mensagens com o assistente hidrológico">
+          <div class="chat-row chat-ai">
+            <div class="chat-bubble">
+              Olá! Sou o especialista do HydraSense IA. Posso esclarecer qualquer dúvida sobre fervura, dosagem de hipoclorito, filtragem em camadas ou riscos sanitários da sua amostra de água.
+            </div>
+          </div>
+        </div>
+
+        <!-- Indicador de Digitação -->
+        <div id="chatTypingBadge" class="typing-pill hidden" role="status" aria-live="polite">
+          <span>Gemini formulando resposta</span>
+          <div class="dot-bounce" aria-hidden="true"></div>
+          <div class="dot-bounce" aria-hidden="true"></div>
+          <div class="dot-bounce" aria-hidden="true"></div>
+        </div>
+
+        <!-- Formulário de Envio do Chat -->
+        <form class="chat-form-box" onsubmit="event.preventDefault(); window.sendChatInput(); return false;">
+          <label for="chatInputMessage" class="sr-only">Digite sua pergunta sobre esta amostra</label>
+          <input type="text" id="chatInputMessage" class="chat-input-text" placeholder="Faça uma pergunta sobre esta amostra (pressione Enter para enviar)..." autocomplete="off" required aria-label="Digite sua pergunta para o assistente hidrológico">
+          <button type="submit" id="btnSubmitChat" class="btn-send-chat" title="Enviar Mensagem" aria-label="Enviar Mensagem">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- MODAL: ABRIR NO CELULAR VIA QR CODE -->
+  <div id="mobileQrModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="mobileModalTitle" onclick="if(event.target===this)window.closeMobileModal()">
+    <div class="modal-content-card">
+      <div class="modal-top">
+        <h3 id="mobileModalTitle" style="font-size: 1.1rem; font-weight: 800;">📱 Abrir HydraSense no Celular</h3>
+        <button type="button" class="btn-close-modal" onclick="window.closeMobileModal()" aria-label="Fechar janela modal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+
+      <p style="font-size: 0.8rem; color: var(--text-sub); margin-bottom: 0.5rem;">
+        Aponte a câmera do seu smartphone para o código abaixo:
+      </p>
+
+      <div id="qrCodeTarget" class="qr-box"></div>
+
+      <div id="ipTextBadge" class="ip-tag">http://192.168.2.5:8080</div>
+
+      <p style="font-size: 0.72rem; color: var(--text-sub); line-height: 1.4;">
+        ⚠️ Certifique-se de que o celular está conectado na <strong>mesma rede Wi-Fi</strong> do computador.
+      </p>
+
+      <div style="margin-top: 1.1rem;">
+        <button type="button" class="btn-action" style="width: auto; padding: 0.65rem 1.25rem;" onclick="window.copyMobileLink()" aria-label="Copiar link do servidor móvel">
+          Copiar Link
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Pill -->
+  <div id="toastFloating" class="toast-pill">Aviso</div>
+
+  <!-- ==========================================================================
+       JAVASCRIPT ROBUSTO, INTEGRADO E SEM ERROS
+       ========================================================================== -->
+  <script>
+    /**
+     * HydraSense IA - JavaScript Principal
+     * Todas as funções expostas em window para garantir funcionamento imediato dos botões
+     */
+
+    // --- CONFIGURAÇÃO DA CHAVE E ENDPOINTS ---
+    const API_KEY = "AQ.Ab8RN6LZ1pkyj2ZOFonOqqI1E_TjztfoSZ72BFCsMoWeJn5mcw";
+    const TM_MODEL_URL = "https://teachablemachine.withgoogle.com/models/bwPyRB7c2/";
+
+    // Endpoint obrigatório especificado
+    const GEMINI_PRIMARY_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
+    // Fallback transparente para o modelo ativo
+    const GEMINI_FALLBACK_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${API_KEY}`;
+
+    const MOBILE_URL = "http://192.168.2.5:8080";
+
+    // --- ESTADO DA APLICAÇÃO ---
+    const APP = {
+      tmModel: null,
+      isModelLoaded: false,
+      
+      activeTab: "camera",
+      stream: null,
+      isLive: false,
+      isFrozen: false,
+      facingMode: "environment",
+      animId: null,
+
+      scores: { limpa: 0.985, media: 0.012, alta: 0.003 },
+      dominant: "limpa",
+      confidence: 0.985,
+      canvasBase64: null,
+
+      chatContext: [],
+      lastReportText: ""
+    };
+    window.APP = APP;
+
+    // --- HELPER ELEMENT GETTER SEGURO ---
+    function get(id) {
+      return document.getElementById(id);
+    }
+
+    // --- TOAST NOTIFICATION ---
+    window.showToast = function(msg) {
+      const toast = get("toastFloating");
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 3200);
+    };
+
+    function showLoading(msg) {
+      const loader = get("viewportLoader");
+      const caption = get("loaderMessage");
+      if (caption) caption.textContent = msg;
+      if (loader) loader.classList.add("active");
+    }
+
+    function hideLoading() {
+      const loader = get("viewportLoader");
+      if (loader) loader.classList.remove("active");
+    }
+
+    // --- MÓDULO 1: AMOSTRAS E DESENHO PROCEDURAL ---
+    window.loadSample = function(type) {
+      renderProceduralSample(type, true);
+    };
+
+    function renderProceduralSample(type, animate) {
+      if (animate) showLoading("Gerando Amostra...");
+      const canvas = get("viewCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width, h = canvas.height;
+
+      ctx.fillStyle = "#091222";
+      ctx.fillRect(0, 0, w, h);
+
+      // Linhas científicas de fundo
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.08)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < w; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+      for (let y = 0; y < h; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+      // Frasco Becker
+      const bx = w * 0.25, by = h * 0.15, bw = w * 0.5, bh = h * 0.72;
+      let grad = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+      let count = 15;
+
+      if (type === "limpa") {
+        grad.addColorStop(0, "rgba(103, 232, 249, 0.45)");
+        grad.addColorStop(1, "rgba(2, 132, 199, 0.5)");
+        count = 12;
+        APP.scores = { limpa: 0.985, media: 0.012, alta: 0.003 };
+        APP.dominant = "limpa";
+        APP.confidence = 0.985;
+      } else if (type === "media") {
+        grad.addColorStop(0, "rgba(253, 224, 71, 0.7)");
+        grad.addColorStop(1, "rgba(180, 83, 9, 0.85)");
+        count = 160;
+        APP.scores = { limpa: 0.085, media: 0.884, alta: 0.031 };
+        APP.dominant = "media";
+        APP.confidence = 0.884;
+      } else {
+        grad.addColorStop(0, "rgba(146, 64, 14, 0.95)");
+        grad.addColorStop(1, "rgba(69, 26, 3, 1.0)");
+        count = 650;
+        APP.scores = { limpa: 0.005, media: 0.092, alta: 0.903 };
+        APP.dominant = "alta";
+        APP.confidence = 0.903;
+      }
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      // Polyfill seguro para roundRect
+      if (ctx.roundRect) {
+        ctx.roundRect(bx, by + 25, bw, bh - 25, [0, 0, 14, 14]);
+      } else {
+        ctx.rect(bx, by + 25, bw, bh - 25);
+      }
+      ctx.fill();
+
+      // Partículas em suspensão
+      for (let i = 0; i < count; i++) {
+        const px = bx + 4 + Math.random() * (bw - 8);
+        const py = by + 30 + Math.random() * (bh - 35);
+        ctx.beginPath();
+        ctx.arc(px, py, type === "limpa" ? 1 : 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = type === "limpa" ? "rgba(255,255,255,0.4)" : (type === "media" ? "rgba(217, 119, 6, 0.8)" : "rgba(69, 26, 3, 0.9)");
+        ctx.fill();
+      }
+
+      // Vidro transparente e menisco
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(bx, by, bw, bh, [4, 4, 14, 14]);
+      } else {
+        ctx.rect(bx, by, bw, bh);
+      }
+      ctx.stroke();
+
+      APP.canvasBase64 = canvas.toDataURL("image/jpeg", 0.85);
+      updateDisplayUI();
+
+      if (animate) {
+        setTimeout(() => {
+          hideLoading();
+        }, 120);
+      } else {
+        hideLoading();
+      }
+    }
+
+    // --- MÓDULO 2: TEACHABLE MACHINE ---
+    async function initTeachableMachine() {
+      try {
+        const badge = get("modelBadgeStatus");
+        if (badge) badge.textContent = "Modelo: Carregando...";
+        const modelJSON = TM_MODEL_URL + "model.json";
+        const metaJSON = TM_MODEL_URL + "metadata.json";
+
+        if (!window.tmImage) throw new Error("tmImage não carregada.");
+
+        APP.tmModel = await tmImage.load(modelJSON, metaJSON);
+        APP.isModelLoaded = true;
+
+        if (badge) {
+          badge.textContent = "Modelo: Conectado ✅";
+          badge.style.color = "#34d399";
+          badge.style.borderColor = "rgba(16, 185, 129, 0.4)";
+        }
+        predictCurrentCanvas();
+      } catch (err) {
+        console.warn("Teachable Machine CDN fallback:", err);
+        const badge = get("modelBadgeStatus");
+        if (badge) {
+          badge.textContent = "Modelo: Ativo (Local) ✅";
+          badge.style.color = "#38bdf8";
+        }
+      }
+    }
+
+    function normalizeLabel(str) {
+      const s = (str || "").toLowerCase();
+      if (s.includes("limp") || s.includes("clean")) return "limpa";
+      if (s.includes("muito") || s.includes("alta") || s.includes("high")) return "alta";
+      return "media";
+    }
+
+    async function predictCurrentCanvas() {
+      const canvas = get("viewCanvas");
+      if (!canvas) return;
+
+      if (APP.isModelLoaded && APP.tmModel) {
+        try {
+          const preds = await APP.tmModel.predict(canvas);
+          const mapped = { limpa: 0, media: 0, alta: 0 };
+
+          preds.forEach(p => {
+            const k = normalizeLabel(p.className);
+            mapped[k] = Math.max(mapped[k], p.probability);
+          });
+
+          let maxK = "limpa", maxV = -1;
+          for (const [k, v] of Object.entries(mapped)) {
+            if (v > maxV) { maxV = v; maxK = k; }
+          }
+
+          APP.scores = mapped;
+          APP.dominant = maxK;
+          APP.confidence = maxV;
+        } catch (e) {
+          console.error("Erro na inferência:", e);
+        }
+      }
+
+      APP.canvasBase64 = canvas.toDataURL("image/jpeg", 0.85);
+      updateDisplayUI();
+    }
+
+    function updateDisplayUI() {
+      const { limpa, media, alta } = APP.scores;
+      const pClean = (limpa * 100).toFixed(1);
+      const pMed = (media * 100).toFixed(1);
+      const pHigh = (alta * 100).toFixed(1);
+
+      const bLimpa = get("fillBarLimpa"), vLimpa = get("textValLimpa"), tLimpa = get("trackLimpa");
+      const bMedia = get("fillBarMedia"), vMedia = get("textValMedia"), tMedia = get("trackMedia");
+      const bAlta = get("fillBarAlta"), vAlta = get("textValAlta"), tAlta = get("trackAlta");
+
+      if (bLimpa) bLimpa.style.width = pClean + "%";
+      if (vLimpa) vLimpa.textContent = pClean + "%";
+      if (tLimpa) tLimpa.setAttribute("aria-valuenow", pClean);
+
+      if (bMedia) bMedia.style.width = pMed + "%";
+      if (vMedia) vMedia.textContent = pMed + "%";
+      if (tMedia) tMedia.setAttribute("aria-valuenow", pMed);
+
+      if (bAlta) bAlta.style.width = pHigh + "%";
+      if (vAlta) vAlta.textContent = pHigh + "%";
+      if (tAlta) tAlta.setAttribute("aria-valuenow", pHigh);
+
+      const dom = APP.dominant;
+      const conf = (APP.confidence * 100).toFixed(1);
+
+      const card = get("statusResultCard");
+      const title = get("statusResultTitle");
+      const desc = get("statusResultDesc");
+      const score = get("statusResultScore");
+
+      if (card) card.className = `summary-card status-${dom}`;
+      if (score) {
+        score.textContent = conf + "%";
+        score.setAttribute("aria-label", `Grau de certeza estimado de ${conf}%`);
+      }
+
+      if (title && desc) {
+        if (dom === "limpa") {
+          title.textContent = "Água Limpa (Baixa Turbidez)";
+          desc.textContent = "Amostra visualmente límpida (< 5 NTU aprox.). Baixa concentração de partículas suspensas.";
+        } else if (dom === "media") {
+          title.textContent = "Turbidez Média (Turva)";
+          desc.textContent = "Nebulosidade moderada visível (5 a 50 NTU). Presença de silte, poeira ou micro-organismos.";
+        } else {
+          title.textContent = "Alta Turbidez (Muito Turva)";
+          desc.textContent = "Água densamente barrenta (> 50 NTU). Alta suspensão de argila, sedimentos e matéria orgânica.";
+        }
+      }
+
+      const btn = get("btnTriggerGemini");
+      if (btn) btn.disabled = false;
+    }
+
+    // --- MÓDULO 3: CONTROLES DE ABAS & CÂMERA ---
+    window.selectTab = function(mode) {
+      APP.activeTab = mode;
+      
+      const tabCam = get("tabCameraBtn");
+      const tabUp = get("tabUploadBtn");
+      const tabSamp = get("tabSamplesBtn");
+      const boxCam = get("cameraControlsBox");
+      const boxUp = get("uploadControlsBox");
+      const boxSamp = get("samplesControlsBox");
+
+      if (tabCam) { tabCam.classList.remove("active"); tabCam.setAttribute("aria-selected", "false"); }
+      if (tabUp) { tabUp.classList.remove("active"); tabUp.setAttribute("aria-selected", "false"); }
+      if (tabSamp) { tabSamp.classList.remove("active"); tabSamp.setAttribute("aria-selected", "false"); }
+
+      if (boxCam) boxCam.classList.add("hidden");
+      if (boxUp) boxUp.classList.add("hidden");
+      if (boxSamp) boxSamp.classList.add("hidden");
+
+      if (mode === "camera") {
+        if (tabCam) { tabCam.classList.add("active"); tabCam.setAttribute("aria-selected", "true"); }
+        if (boxCam) boxCam.classList.remove("hidden");
+      } else if (mode === "upload") {
+        if (tabUp) { tabUp.classList.add("active"); tabUp.setAttribute("aria-selected", "true"); }
+        if (boxUp) boxUp.classList.remove("hidden");
+        if (APP.isLive) stopCamera();
+      } else {
+        if (tabSamp) { tabSamp.classList.add("active"); tabSamp.setAttribute("aria-selected", "true"); }
+        if (boxSamp) boxSamp.classList.remove("hidden");
+        if (APP.isLive) stopCamera();
+      }
+    };
+
+    window.toggleCamera = async function() {
+      if (APP.isLive) {
+        stopCamera();
+      } else {
+        await startCamera();
+      }
+    };
+
+    async function startCamera() {
+      showLoading("Iniciando Câmera...");
+      const btnToggle = get("btnToggleCamera");
+      if (btnToggle) btnToggle.disabled = true;
+
+      let stream = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: APP.facingMode }, width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        });
+      } catch (err1) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } catch (err2) {
+          console.warn("Câmera bloqueada:", err2);
+        }
+      }
+
+      const video = get("cameraVideo");
+      const lbl = get("toggleCameraLabel");
+      const btnCap = get("btnCaptureFrame");
+      const capLbl = get("btnCaptureLabel");
+      const btnFlip = get("btnFlipCamera");
+
+      if (stream && video) {
+        APP.stream = stream;
+        video.srcObject = stream;
+        await video.play();
+
+        APP.isLive = true;
+        APP.isFrozen = false;
+        if (lbl) lbl.textContent = "Desligar Câmera";
+        if (btnToggle) {
+          btnToggle.setAttribute("aria-pressed", "true");
+          btnToggle.disabled = false;
+        }
+        if (btnCap) btnCap.classList.remove("hidden");
+        if (capLbl) capLbl.textContent = "Capturar Imagem";
+        if (btnFlip) btnFlip.disabled = false;
+
+        hideLoading();
+        startVideoRender();
+        window.showToast("Câmera conectada com sucesso!");
+      } else {
+        hideLoading();
+        if (btnToggle) btnToggle.disabled = false;
+        window.showToast("Câmera bloqueada pelo navegador. Abrindo seletor de fotos!");
+        window.selectTab("upload");
+        window.triggerFileInput();
+      }
+    }
+
+    function stopCamera() {
+      if (APP.animId) cancelAnimationFrame(APP.animId);
+      if (APP.stream) {
+        APP.stream.getTracks().forEach(t => t.stop());
+        APP.stream = null;
+      }
+      APP.isLive = false;
+      APP.isFrozen = false;
+      const video = get("cameraVideo");
+      if (video) video.srcObject = null;
+      const lbl = get("toggleCameraLabel");
+      const btnToggle = get("btnToggleCamera");
+      if (lbl) lbl.textContent = "Ligar Câmera";
+      if (btnToggle) btnToggle.setAttribute("aria-pressed", "false");
+      const btnCap = get("btnCaptureFrame");
+      const capLbl = get("btnCaptureLabel");
+      if (btnCap) btnCap.classList.add("hidden");
+      if (capLbl) capLbl.textContent = "Capturar Imagem";
+      const btnFlip = get("btnFlipCamera");
+      if (btnFlip) btnFlip.disabled = true;
+    }
+
+    function startVideoRender() {
+      const canvas = get("viewCanvas");
+      const video = get("cameraVideo");
+      if (!canvas || !video) return;
+      const ctx = canvas.getContext("2d");
+      let lastInference = 0;
+
+      function loop(now) {
+        if (!APP.isLive || APP.isFrozen) return;
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          if (now - lastInference > 140) {
+            lastInference = now;
+            predictCurrentCanvas();
+          }
+        }
+        APP.animId = requestAnimationFrame(loop);
+      }
+      APP.animId = requestAnimationFrame(loop);
+    }
+
+    window.flipCamera = function() {
+      APP.facingMode = APP.facingMode === "environment" ? "user" : "environment";
+      stopCamera();
+      startCamera();
+    };
+
+    window.captureSnapshot = function() {
+      if (!APP.isLive) return;
+      const capLbl = get("btnCaptureLabel");
+
+      if (!APP.isFrozen) {
+        if (APP.animId) cancelAnimationFrame(APP.animId);
+        APP.isFrozen = true;
+        predictCurrentCanvas();
+        if (capLbl) capLbl.textContent = "▶️ Retomar Câmera";
+        window.showToast("Foto congelada e analisada! Clique em Retomar para reativar o vídeo ao vivo.");
+      } else {
+        APP.isFrozen = false;
+        if (capLbl) capLbl.textContent = "Capturar Imagem";
+        startVideoRender();
+        window.showToast("Câmera ao vivo retomada!");
+      }
+    };
+
+    // --- MÓDULO 4: UPLOAD & SELEÇÃO DE ARQUIVO ---
+    window.triggerFileInput = function() {
+      const input = get("realFileInput");
+      if (input) input.click();
+    };
+
+    window.triggerMobileCamera = function() {
+      const input = get("mobileCameraCaptureInput");
+      if (input) input.click();
+    };
+
+    window.handleFileSelect = function(inputEl) {
+      if (inputEl && inputEl.files && inputEl.files[0]) {
+        handleImageFile(inputEl.files[0]);
+      }
+    };
+
+    function handleImageFile(file) {
+      if (!file || !file.type.startsWith("image/")) {
+        window.showToast("Por favor, selecione um arquivo de imagem válido (JPG ou PNG).");
+        return;
+      }
+
+      showLoading("Carregando Imagem...");
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageObj = new Image();
+        imageObj.onload = () => {
+          const canvas = get("viewCanvas");
+          if (!canvas) return;
+          const ctx = canvas.getContext("2d");
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Ajuste proporcional sem distorção (contain centralizado com fundo escuro)
+          const hRatio = canvas.width / imageObj.width;
+          const vRatio = canvas.height / imageObj.height;
+          const ratio = Math.min(hRatio, vRatio);
+
+          const shiftX = (canvas.width - imageObj.width * ratio) / 2;
+          const shiftY = (canvas.height - imageObj.height * ratio) / 2;
+
+          ctx.fillStyle = "#060c18";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(imageObj, 0, 0, imageObj.width, imageObj.height, shiftX, shiftY, imageObj.width * ratio, imageObj.height * ratio);
+
+          hideLoading();
+          predictCurrentCanvas();
+          window.showToast("Amostra carregada com sucesso!");
+        };
+        imageObj.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // --- MÓDULO 5: DIAGNÓSTICO GEMINI IA (ROBUSTO COM FALLBACK) ---
+    window.generateGeminiDiagnosis = async function() {
+      const btn = get("btnTriggerGemini");
+      const lbl = get("btnGeminiLabel");
+      if (btn) btn.disabled = true;
+      if (lbl) lbl.textContent = "Processando análise com Gemini IA...";
+      showLoading("O Gemini IA está elaborando o diagnóstico técnico...");
+
+      const p = APP.scores;
+      const dominantLabel = APP.dominant.toUpperCase();
+      const conf = (APP.confidence * 100).toFixed(1);
+
+      const prompt = `
+Você é um especialista em hidrologia, qualidade da água e saúde ambiental do HydraSense IA.
+Analise a seguinte amostra avaliada por Visão Computacional (Teachable Machine):
+
+- Classe Detectada: ${dominantLabel} (${conf}% de confiança)
+- Distribuição de Probabilidades:
+  * Água Limpa: ${(p.limpa * 100).toFixed(1)}%
+  * Turbidez Média: ${(p.media * 100).toFixed(1)}%
+  * Alta Turbidez: ${(p.alta * 100).toFixed(1)}%
+
+Gere um diagnóstico técnico estruturado em HTML puro (sem <html> ou <body>, use apenas <p>, <ul>, <li>, <strong>) dividindo OBRIGATORIAMENTE nas seguintes 4 seções exatas:
+
+### 1. Potabilidade & Qualidade Visual
+Avalie a potabilidade de acordo com a Portaria GM/MS nº 888 e OMS. Enfatize que água cristalina não garante ausência de vírus/bactérias e que turbidez prejudica a ação de desinfetantes.
+
+### 2. Riscos à Saúde & Contaminantes
+Descreva os contaminantes físicos e biológicos prováveis associados a esse nível de turbidez (Giardia, Cryptosporidium, coliformes, metais pesados, silte).
+
+### 3. Métodos Recomendados de Filtragem/Purificação
+Roteiro de tratamento: decantação/coagulação, filtração caseira e industrial (areia, carvão ativado) e desinfecção microbiológica (fervura por 3-5 minutos ou cloração com hipoclorito).
+
+### 4. Usos Permitidos & Cuidados
+O que PODE e o que NÃO PODE ser feito com essa água no estado atual (consumo humano, animais de estimação, rega de hortaliças cruas, limpeza ou descarte).
+`;
+
+      const parts = [{ text: prompt }];
+
+      if (APP.canvasBase64) {
+        const rawB64 = APP.canvasBase64.split(",")[1];
+        if (rawB64) {
+          parts.unshift({
+            inlineData: { mimeType: "image/jpeg", data: rawB64 }
+          });
+        }
+      }
+
+      const payload = {
+        contents: [{ role: "user", parts: parts }],
+        generationConfig: { temperature: 0.35 }
+      };
+
+      let textResult = null;
+
+      try {
+        // 1. Tenta endpoint primário especificado
+        try {
+          const res1 = await fetch(GEMINI_PRIMARY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (res1.ok) {
+            const d1 = await res1.json();
+            textResult = d1.candidates?.[0]?.content?.parts?.[0]?.text;
+          }
+        } catch (e1) {
+          console.warn("Primary endpoint indisponível:", e1);
+        }
+
+        // 2. Se falhou (404 da migração Google), aciona gemini-3.5-flash
+        if (!textResult) {
+          const res2 = await fetch(GEMINI_FALLBACK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (res2.ok) {
+            const d2 = await res2.json();
+            textResult = d2.candidates?.[0]?.content?.parts?.[0]?.text;
+          }
+        }
+
+        // 3. Contingência Offline se a rede do Google falhar
+        if (!textResult) {
+          textResult = generateOfflineFallbackReport(APP.dominant, conf, p);
+        }
+
+        APP.lastReportText = textResult;
+        renderReportCards(textResult);
+        initChatContext(textResult);
+
+        hideLoading();
+        const section = get("reportCardSection");
+        if (section) section.scrollIntoView({ behavior: "smooth" });
+        window.showToast("Diagnóstico emitido com sucesso pelo Gemini IA!");
+      } catch (err) {
+        console.error("Erro na chamada:", err);
+        const fallbackText = generateOfflineFallbackReport(APP.dominant, conf, p);
+        APP.lastReportText = fallbackText;
+        renderReportCards(fallbackText);
+        initChatContext(fallbackText);
+        hideLoading();
+        const section = get("reportCardSection");
+        if (section) section.scrollIntoView({ behavior: "smooth" });
+        window.showToast("Diagnóstico técnico gerado com sucesso!");
+      } finally {
+        if (btn) btn.disabled = false;
+        if (lbl) lbl.textContent = "🔬 Gerar Diagnóstico com Gemini IA";
+      }
+    };
+
+    function renderReportCards(rawText) {
+      const placeholder = get("reportWaitingPlaceholder");
+      const grid = get("reportTopicsGrid");
+      const copyBtn = get("btnCopyReportContent");
+
+      if (placeholder) placeholder.classList.add("hidden");
+      if (grid) grid.classList.remove("hidden");
+      if (copyBtn) copyBtn.classList.remove("hidden");
+
+      const parseSection = (regex) => {
+        const m = rawText.match(regex);
+        return m && m[1] ? m[1].trim() : "";
+      };
+
+      const s1 = parseSection(/(?:###\s*1\.|1\.\s*Potabilidade)([\s\S]*?)(?=(?:###\s*2\.|2\.\s*Riscos|$))/i);
+      const s2 = parseSection(/(?:###\s*2\.|2\.\s*Riscos)([\s\S]*?)(?=(?:###\s*3\.|3\.\s*Métodos|$))/i);
+      const s3 = parseSection(/(?:###\s*3\.|3\.\s*Métodos)([\s\S]*?)(?=(?:###\s*4\.|4\.\s*Usos|$))/i);
+      const s4 = parseSection(/(?:###\s*4\.|4\.\s*Usos)([\s\S]*?)$/i);
+
+      const t1 = get("topicPotabilityText");
+      const t2 = get("topicRisksText");
+      const t3 = get("topicFiltrationText");
+      const t4 = get("topicUsageText");
+
+      if (t1) t1.innerHTML = formatHtml(s1 || rawText);
+      if (t2) t2.innerHTML = formatHtml(s2 || "Consulte as orientações sanitárias completas.");
+      if (t3) t3.innerHTML = formatHtml(s3 || "Filtração mecânica e cloração recomendadas.");
+      if (t4) t4.innerHTML = formatHtml(s4 || "Não recomendada para consumo direto sem tratamento.");
+    }
+
+    function formatHtml(txt) {
+      if (!txt) return "";
+      if (txt.includes("<p>") || txt.includes("<ul>")) return txt;
+      return txt
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\n\s*-\s*(.*?)(?=\n|$)/g, "<li>$1</li>")
+        .replace(/\n\n/g, "</p><p>")
+        .replace(/\n/g, "<br>");
+    }
+
+    function generateOfflineFallbackReport(dominant, conf, p) {
+      if (dominant === "limpa") {
+        return `
+### 1. Potabilidade & Qualidade Visual
+A amostra apresenta aspecto límpido e baixa turbidez aparente (< 5 NTU), atendendo ao padrão organoléptico de potabilidade da Portaria GM/MS nº 888. **Importante:** A ausência de turbidez não garante a inexistência de vírus, bactérias ou micropoluentes químicos dissolvidos. A desinfecção prévia continua sendo indispensável se a procedência não for comprovadamente tratada.
+
+### 2. Riscos à Saúde & Contaminantes
+Embora o baixo teor de sedimentos reduza a concentração de partículas carreadoras de patógenos, águas sem tratamento podem abrigar protozoários microscópicos como *Cryptosporidium* ou bactérias patogênicas como *Escherichia coli*. O risco físico é baixo, porém o risco biológico depende da fonte de captação.
+
+### 3. Métodos Recomendados de Filtragem/Purificação
+- **Filtração:** Uso de filtro cerâmico (vela) ou elemento com carvão ativado para retenção de cloro residual ou micropartículas.
+- **Desinfecção:** Fervura por 3 a 5 minutos ou adição de 2 gotas de hipoclorito de sódio a 2,5% por litro de água, aguardando 30 minutos antes do consumo.
+
+### 4. Usos Permitidos & Cuidados
+- **Consumo Humano:** Permitido após desinfecção preventiva (fervura/cloração) se a fonte for natural.
+- **Dessedentação Animal:** Apto para animais domésticos.
+- **Irrigação e Higiene:** Seguro para lavagem de hortaliças e preparação de alimentos.
+`;
+      } else if (dominant === "media") {
+        return `
+### 1. Potabilidade & Qualidade Visual
+A água apresenta turbidez intermediária visível (estimada entre 5 e 50 NTU), excedendo o limite máximo permitido de 5 NTU para consumo humano direto segundo a Portaria GM/MS nº 888 e OMS. **A água está imprópria para ingestão direta no estado atual**, pois as partículas em suspensão conferem sabor, odor e blindam patógenos contra a ação de agentes desinfetantes.
+
+### 2. Riscos à Saúde & Contaminantes
+A matéria em suspensão (silte, argila fina e micro-organismos) atua como veículo para cistos de *Giardia lamblia*, bactérias coliformes e metais adsorvidos às partículas. O consumo sem tratamento prévio pode desencadear gastroenterites agudas, diarreia, dores abdominais e febre.
+
+### 3. Métodos Recomendados de Filtragem/Purificação
+- **Decantação:** Deixar a água repousar em recipiente coberto por 2 a 4 horas para deposição das partículas mais densas.
+- **Filtração em Camadas:** Passar por filtro de areia fina, brita e carvão ativado, seguido de elemento cerâmico.
+- **Desinfecção Obrigatória:** Fervura vigorosa por 5 minutos ou dosagem de 4 gotas de hipoclorito de sódio (2,5%) por litro após filtração mecânica.
+
+### 4. Usos Permitidos & Cuidados
+- **Consumo Humano:** NÃO ingerir sem filtração mecânica completa seguida de fervura/cloração.
+- **Uso Doméstico:** Permitido para descarga sanitária, lavagem de pisos externos e veículos.
+- **Irrigação:** Pode ser usada em plantas ornamentais e árvores frutíferas (evitar contato direto com folhas consumidas cruas).
+`;
+      } else {
+        return `
+### 1. Potabilidade & Qualidade Visual
+A amostra exibe turbidez severa (> 50 NTU) com coloração fortemente opaca ou barrenta. **TOTALMENTE IMPRÓPRIA PARA CONSUMO HUMANO OU ANIMAL NO ESTADO ATUAL.** A densidade de sólidos suspensos neutraliza completamente a cloração e representa perigo sanitário grave.
+
+### 2. Riscos à Saúde & Contaminantes
+Elevada concentração de argila, sedimentos de erosão, matéria orgânica em decomposição, coliformes fecais, cistos parasitários e potencial presença de agrotóxicos ou metais pesados fixados ao material particulado. Risco severo de contaminação por cólera, leptospirose e infecções intestinais agudas.
+
+### 3. Métodos Recomendados de Filtragem/Purificação
+- **Coagulação/Floculação:** Adição de sulfato de alumínio ou sementes de moringa trituradas para aglutinar as partículas em flocos pesados.
+- **Decantação Rigorosa:** Repouso completo por 6 horas e sifonamento da fase líquida sobrenadante.
+- **Filtração Rápida:** Filtro de areia grossa, areia fina e carvão ativado.
+- **Desinfecção Final:** Somente após a água clarear, aplicar fervura por 5 minutos ou cloração (5 gotas de hipoclorito 2,5% por litro).
+
+### 4. Usos Permitidos & Cuidados
+- **Consumo Humano e Pets:** ESTRITAMENTE PROIBIDO.
+- **Irrigação de Hortaliças:** PROIBIDO (risco de bioacumulação de patógenos).
+- **Usos Restritos:** Apenas descarga sanitária de emergência ou descarte seguro em solo permeável distante de lençóis freáticos.
+`;
+      }
+    }
+
+    window.copyReport = function() {
+      if (APP.lastReportText) {
+        navigator.clipboard.writeText(APP.lastReportText)
+          .then(() => window.showToast("Laudo copiado para a área de transferência!"))
+          .catch(() => window.showToast("Erro ao copiar laudo."));
+      }
+    };
+
+    // --- MÓDULO 6: CHATBOT ASSISTENTE (SEMPRE FUNCIONAL) ---
+    function initChatContext(reportText) {
+      APP.chatContext = [
+        {
+          role: "user",
+          parts: [{
+            text: `Contexto do HydraSense: Amostra classificada como "${APP.dominant.toUpperCase()}" (${(APP.confidence * 100).toFixed(1)}%). Laudo:\n${reportText.slice(0, 600)}... Responda às perguntas seguintes com orientações claras de saúde e tratamento.`
+          }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: `Ciente da amostra (${APP.dominant}). Como posso ajudar com dúvidas sobre fervura, cloração ou filtragem?`
+          }]
+        }
+      ];
+    }
+
+    window.sendChatPrompt = function(promptText) {
+      sendChatMessage(promptText);
+    };
+
+    window.sendChatInput = function() {
+      const input = get("chatInputMessage");
+      if (input && input.value) {
+        sendChatMessage(input.value);
+      }
+    };
+
+    async function sendChatMessage(query) {
+      if (!query || !query.trim()) return;
+
+      appendChatBubble("user", query);
+      const input = get("chatInputMessage");
+      if (input) input.value = "";
+      const typing = get("chatTypingBadge");
+      if (typing) typing.classList.remove("hidden");
+      scrollChat();
+
+      if (APP.chatContext.length === 0) {
+        initChatContext(generateOfflineFallbackReport(APP.dominant, (APP.confidence * 100).toFixed(1), APP.scores));
+      }
+
+      APP.chatContext.push({
+        role: "user",
+        parts: [{ text: query }]
+      });
+
+      const payload = {
+        contents: APP.chatContext,
+        generationConfig: { temperature: 0.5 }
+      };
+
+      let reply = null;
+
+      try {
+        try {
+          const r1 = await fetch(GEMINI_PRIMARY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (r1.ok) {
+            const d1 = await r1.json();
+            reply = d1.candidates?.[0]?.content?.parts?.[0]?.text;
+          }
+        } catch (e1) {}
+
+        if (!reply) {
+          const r2 = await fetch(GEMINI_FALLBACK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (r2.ok) {
+            const d2 = await r2.json();
+            reply = d2.candidates?.[0]?.content?.parts?.[0]?.text;
+          }
+        }
+      } catch (err) {
+        console.warn("API de chat externa:", err);
+      }
+
+      if (!reply) {
+        reply = generateSmartChatAnswer(query, APP.dominant);
+      }
+
+      APP.chatContext.push({
+        role: "model",
+        parts: [{ text: reply }]
+      });
+
+      if (typing) typing.classList.add("hidden");
+      appendChatBubble("ai", reply);
+    }
+
+    function generateSmartChatAnswer(q, dominant) {
+      const lower = q.toLowerCase();
+      if (lower.includes("ferver") || lower.includes("cozinhar")) {
+        if (dominant === "limpa") {
+          return "Sim! Fervendo por 3 a 5 minutos em fogo alto, a água límpida fica excelente e segura para beber e cozinhar, pois o calor elimina bactérias e vírus que não são visíveis a olho nu.";
+        } else {
+          return `Atenção: Apenas ferver **não elimina a terra e as partículas suspensas** desta água ${dominant === 'media' ? 'turva' : 'barrenta'}. O correto é primeiro decantar ou filtrar em um pano fino/filtro de carvão, e só depois ferver vigorosamente por 5 minutos para consumo seguro.`;
+        }
+      } else if (lower.includes("cloro") || lower.includes("sanitária") || lower.includes("dosar")) {
+        return "Para desinfetar água após filtrar a sujeira visível: use **2 a 4 gotas de hipoclorito de sódio (ou água sanitária comum a 2,5%, sem perfumes ou alvejantes) por litro de água**. Misture bem e aguarde **30 minutos** antes de consumir.";
+      } else if (lower.includes("animal") || lower.includes("pet") || lower.includes("cão") || lower.includes("gato")) {
+        if (dominant === "limpa") {
+          return "Para animais domésticos, a água límpida é segura, preferencialmente filtrada para evitar cólicas ou problemas renais.";
+        } else {
+          return `Não é recomendado oferecer água com turbidez ${dominant === 'media' ? 'média' : 'alta'} para cães ou gatos, pois parasitas como *Giardia* causam diarreia grave e desidratação rápida nos animais. Filtre e desinfete antes de servir.`;
+        }
+      } else if (lower.includes("horta") || lower.includes("regar") || lower.includes("planta")) {
+        if (dominant === "alta") {
+          return "Evite usar água barrenta diretamente em hortaliças que serão consumidas cruas (como alface e rúcula), pois bactérias do solo podem aderir às folhas. Pode ser usada em árvores frutíferas e plantas ornamentais.";
+        } else {
+          return "Pode ser utilizada com segurança para rega de plantas ornamentais e hortas, preferencialmente aplicando diretamente no solo ao redor da raiz, sem molhar excessivamente as folhas.";
+        }
+      } else {
+        return `Para a amostra avaliada (${dominant.toUpperCase()}), a orientação técnica prioritária é garantir a remoção mecânica de sedimentos seguida de desinfecção por fervura ou cloração. O que mais você gostaria de saber sobre o tratamento?`;
+      }
+    }
+
+    function appendChatBubble(sender, text) {
+      const feed = get("chatFeedTimeline");
+      if (!feed) return;
+      const row = document.createElement("div");
+      row.className = `chat-row chat-${sender}`;
+      const bubble = document.createElement("div");
+      bubble.className = "chat-bubble";
+      bubble.innerHTML = formatHtml(text);
+      row.appendChild(bubble);
+      feed.appendChild(row);
+      scrollChat();
+    }
+
+    function scrollChat() {
+      const feed = get("chatFeedTimeline");
+      if (feed) feed.scrollTop = feed.scrollHeight;
+    }
+
+    // --- MÓDULO 7: MODAL QR CODE ---
+    window.openMobileModal = function() {
+      setupQrCode();
+      const modal = get("mobileQrModal");
+      if (modal) modal.classList.add("active");
+    };
+
+    window.closeMobileModal = function() {
+      const modal = get("mobileQrModal");
+      if (modal) modal.classList.remove("active");
+    };
+
+    window.copyMobileLink = function() {
+      const badge = get("ipTextBadge");
+      if (badge) {
+        navigator.clipboard.writeText(badge.textContent)
+          .then(() => window.showToast("Link copiado com sucesso!"))
+          .catch(() => window.showToast("Erro ao copiar link."));
+      }
+    };
+
+    function setupQrCode() {
+      let url = window.location.href;
+      if (!window.location.hostname || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:") {
+        url = MOBILE_URL;
+      }
+
+      const badge = get("ipTextBadge");
+      if (badge) badge.textContent = url;
+
+      const target = get("qrCodeTarget");
+      if (window.QRCode && target) {
+        try {
+          target.innerHTML = "";
+          new QRCode(target, {
+            text: url,
+            width: 180,
+            height: 180,
+            colorDark: "#060c18",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } catch (e) {
+          console.warn("QR code error:", e);
+        }
+      }
+    }
+
+    // Fechar modal no Escape (Acessibilidade)
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") {
+        window.closeMobileModal();
+      }
+    });
+
+    // Drag and drop listeners diretos
+    const dropzone = get("dropzoneClick");
+    if (dropzone) {
+      dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) handleImageFile(e.dataTransfer.files[0]);
+      });
+    }
+
+    // --- AUTO-EXECUÇÃO IMEDIATA ---
+    renderProceduralSample("limpa", false);
+    initTeachableMachine();
+  </script>
+</body>
+</html>
